@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  App as AntApp, Avatar, Button, Card, Col, DatePicker, Descriptions, Drawer, Form, Input,
-  InputNumber, Modal, Row, Select, Space, Switch, Table, Tabs, Tag,
+  App as AntApp, AutoComplete, Avatar, Button, Card, Col, DatePicker, Descriptions, Drawer, Form, Input,
+  InputNumber, Modal, Popconfirm, Row, Select, Space, Switch, Table, Tabs, Tag,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { DownloadOutlined, PlusOutlined } from '@ant-design/icons';
@@ -14,7 +14,7 @@ import { computePerformance, RADAR_DIMS } from '../utils/performance';
 import { downloadCSV } from '../utils/csv';
 import EChart from '../components/EChart';
 
-/** 表单值类型（日期为 Dayjs，提交时转字符串） */
+/** 表单值类型（日期为 Dayjs，提交时转字符串；界别/镇街为可搜索+可输入新值） */
 interface DeputyFormValues {
   name: string;
   gender: Deputy['gender'];
@@ -44,9 +44,9 @@ function nextDeputyId(list: Deputy[]): string {
   return 'DB' + String(max + 1).padStart(4, '0');
 }
 
-/** 代表档案管理：列表（搜索/筛选/分页/CSV）+ 详情抽屉（画像雷达图）+ 新增/编辑 */
+/** 代表档案管理：页头醒目新增入口 + 列表（搜索/筛选/分页/CSV/删除）+ 详情抽屉（履职画像）+ 新增/编辑 */
 export default function Deputies() {
-  const { user, deputies, activities, proposals, saveDeputy } = useStore();
+  const { user, deputies, activities, proposals, saveDeputy, removeDeputy } = useStore();
   const { message } = AntApp.useApp();
   const isAdmin = user?.role === 'admin';
 
@@ -118,7 +118,8 @@ export default function Deputies() {
   const submit = (v: DeputyFormValues) => {
     const id = editing ? editing.id : nextDeputyId(deputies);
     saveDeputy({ ...v, id, joinDate: v.joinDate.format('YYYY-MM-DD') });
-    message.success(editing ? '档案已更新' : '档案已新增');
+    // 登录页“人大代表”下拉来自 store（非写死 mock），新增代表后立即出现在下拉中
+    message.success(editing ? '档案已更新' : '档案已新增，退出后可在登录页用该代表身份进入');
     setModalOpen(false);
   };
 
@@ -175,21 +176,43 @@ export default function Deputies() {
     {
       title: '操作',
       key: 'op',
-      width: 130,
+      width: 180,
       fixed: 'right',
       render: (_, d) => (
-        <Space>
+        <Space size={0}>
           <Button type="link" size="small" onClick={() => setDetailId(d.id)}>详情</Button>
           {isAdmin && <Button type="link" size="small" onClick={() => openEdit(d)}>编辑</Button>}
+          {isAdmin && (
+            <Popconfirm
+              title="确认删除该代表档案？"
+              description="仅从档案列表移除（演示数据可重置）；其历史活动与建议记录保留。"
+              okText="删除"
+              cancelText="取消"
+              onConfirm={() => {
+                removeDeputy(d.id);
+                message.success('档案已删除');
+              }}
+            >
+              <Button type="link" size="small" danger>删除</Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
   ];
-
   const detail = detailId ? deputies.find((d) => d.id === detailId) : undefined;
 
   return (
     <div>
+      {/* 页面标题区域：更显眼的新增主按钮（管理员可见） */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <span style={{ fontSize: 17, fontWeight: 600 }}>代表档案管理</span>
+        {isAdmin && (
+          <Button type="primary" size="large" icon={<PlusOutlined />} onClick={openAdd}>
+            新增代表档案
+          </Button>
+        )}
+      </div>
       <Card size="small">
         <Space wrap style={{ marginBottom: 16 }}>
           <Input.Search allowClear placeholder="搜索姓名 / 编号" style={{ width: 220 }} value={kw} onChange={(e) => setKw(e.target.value)} />
@@ -204,7 +227,7 @@ export default function Deputies() {
           columns={columns}
           dataSource={list}
           size="middle"
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1050 }}
           pagination={{ pageSize: 10, showSizeChanger: false, showTotal: (t) => '共 ' + t + ' 名代表' }}
         />
       </Card>
@@ -226,8 +249,26 @@ export default function Deputies() {
             <Col span={8}><Form.Item name="gender" label="性别" rules={[{ required: true, message: '请选择性别' }]}><Select options={[{ value: '男', label: '男' }, { value: '女', label: '女' }]} /></Form.Item></Col>
             <Col span={8}><Form.Item name="birthYear" label="出生年份" rules={[{ required: true, message: '请填写出生年份' }]}><InputNumber min={1930} max={2010} style={{ width: '100%' }} /></Form.Item></Col>
             <Col span={8}><Form.Item name="political" label="政治面貌" rules={[{ required: true, message: '请选择' }]}><Select options={['中共党员', '群众', '民主党派'].map((s) => ({ value: s, label: s }))} /></Form.Item></Col>
-            <Col span={8}><Form.Item name="sector" label="界别" rules={[{ required: true, message: '请选择界别' }]}><Select options={sectorOpts.map((s) => ({ value: s, label: s }))} /></Form.Item></Col>
-            <Col span={8}><Form.Item name="town" label="所属镇街" rules={[{ required: true, message: '请选择' }]}><Select options={townOpts.map((s) => ({ value: s, label: s }))} /></Form.Item></Col>
+            {/* 界别：可搜索、允许输入新值（AutoComplete） */}
+            <Col span={8}>
+              <Form.Item name="sector" label="界别" rules={[{ required: true, message: '请选择或输入界别' }]}>
+                <AutoComplete
+                  options={sectorOpts.map((s) => ({ value: s }))}
+                  filterOption={(input, option) => String(option?.value ?? '').includes(input)}
+                  placeholder="搜索或输入新界别"
+                />
+              </Form.Item>
+            </Col>
+            {/* 所属镇街：可搜索、允许输入新值（AutoComplete） */}
+            <Col span={8}>
+              <Form.Item name="town" label="所属镇街" rules={[{ required: true, message: '请选择或输入镇街' }]}>
+                <AutoComplete
+                  options={townOpts.map((s) => ({ value: s }))}
+                  filterOption={(input, option) => String(option?.value ?? '').includes(input)}
+                  placeholder="搜索或输入新镇街"
+                />
+              </Form.Item>
+            </Col>
             <Col span={8}><Form.Item name="level" label="层级" rules={[{ required: true, message: '请填写层级' }]}><Input placeholder="如：镇第七届人大代表" /></Form.Item></Col>
             <Col span={8}><Form.Item name="termStart" label="本届起始年" rules={[{ required: true, message: '请填写年份' }]}><InputNumber min={2015} max={2030} style={{ width: '100%' }} /></Form.Item></Col>
             <Col span={8}><Form.Item name="consecutive" label="连任情况" valuePropName="checked"><Switch checkedChildren="连任" unCheckedChildren="新任" /></Form.Item></Col>

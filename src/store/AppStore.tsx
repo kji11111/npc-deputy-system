@@ -38,12 +38,13 @@ function patchProposal(proposals: Proposal[], id: string, patch: (p: Proposal) =
 
 /**
  * 全局状态与业务动作。
- * 提案建议交办工作流（每次状态变更都会追加一条 FlowRecord 流转记录）：
- *   待审核 --assignProposal(审核交办：承办单位+期限)--> 已交办
- *          --acceptProposal(登记受理)--> 办理中
- *          --replyProposal(登记答复)--> 已答复
- *          --evaluateProposal(领衔代表评价)--> 满意/基本满意 → 已评价（办结）
- *                                            → 不满意     → 已退回 --再次交办--> 已交办
+ * 提案建议交办工作流（每次状态变更都会追加一条 FlowRecord 流转记录，文案体现“谁推给谁”）：
+ *   待审核 --assignProposal(人大办审核交办：承办单位+期限)--> 已交办
+ *          --acceptProposal(承办单位受理)--> 办理中
+ *          --replyProposal(承办单位登记答复，推回人大办)--> 待转送
+ *          --transferProposal(人大办转送领衔代表)--> 已答复
+ *          --evaluateProposal(领衔代表满意度评价)--> 满意/基本满意 → 已评价（办结）
+ *                                                  → 不满意 → 已退回 --再次交办--> 已交办
  */
 export interface Store {
   user: User | null;
@@ -54,12 +55,20 @@ export interface Store {
   logout: () => void;
   resetData: () => void;
   saveDeputy: (deputy: Deputy) => void;
+  /** 删除代表档案（仅从档案列表移除，其历史活动/建议记录保留） */
+  removeDeputy: (id: string) => void;
   saveActivity: (activity: Activity) => void;
   removeActivity: (id: string) => void;
   addProposal: (draft: Omit<Proposal, 'id' | 'flow' | 'status'>, actorName: string) => void;
+  /** 管理员：审核交办 / 退回件再次交办 */
   assignProposal: (id: string, org: string, deadline: string, actor: string) => void;
+  /** 承办单位：登记受理（已交办 → 办理中），actor 为单位名称 */
   acceptProposal: (id: string, actor: string) => void;
+  /** 承办单位：登记答复（办理中 → 待转送），部门办完推回人大办 */
   replyProposal: (id: string, reply: string, actor: string) => void;
+  /** 管理员：转送代表（待转送 → 已答复） */
+  transferProposal: (id: string, actor: string) => void;
+  /** 领衔代表：满意度评价（不满意 → 退回重办） */
   evaluateProposal: (id: string, satisfaction: Satisfaction, actor: string) => void;
 }
 
@@ -107,6 +116,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const removeDeputy = useCallback((id: string) => {
+    setDb((prev) => ({ ...prev, deputies: prev.deputies.filter((d) => d.id !== id) }));
+  }, []);
+
   const saveActivity = useCallback((activity: Activity) => {
     setDb((prev) => ({
       ...prev,
@@ -120,7 +133,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setDb((prev) => ({ ...prev, activities: prev.activities.filter((a) => a.id !== id) }));
   }, []);
 
-  /** 新提交的建议一律从“待审核”起步，并写入第一条流转记录 */
+  /** 新提交的建议一律从“待审核”起步，编号在当年最大号上自增，并写入第一条流转记录 */
   const addProposal = useCallback((draft: Omit<Proposal, 'id' | 'flow' | 'status'>, actorName: string) => {
     setDb((prev) => {
       const y = dayjs().year();
@@ -156,28 +169,40 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  /** 管理员：登记承办单位受理（已交办 → 办理中） */
+  /** 承办单位：登记受理（已交办 → 办理中），时间线记录“XX受理” */
   const acceptProposal = useCallback((id: string, actor: string) => {
     setDb((prev) => ({
       ...prev,
       proposals: patchProposal(prev.proposals, id, (p) => ({
         ...p,
         status: '办理中',
-        flow: [...p.flow, { time: now(), actor, action: '承办单位受理，进入办理阶段' }],
+        flow: [...p.flow, { time: now(), actor, action: actor + '受理' }],
       })),
     }));
   }, []);
 
-  /** 管理员：登记答复（办理中 → 已答复） */
+  /** 承办单位：登记答复（办理中 → 待转送），部门办完推回人大办 */
   const replyProposal = useCallback((id: string, reply: string, actor: string) => {
     setDb((prev) => ({
       ...prev,
       proposals: patchProposal(prev.proposals, id, (p) => ({
         ...p,
-        status: '已答复',
+        status: '待转送',
         reply,
         repliedAt: now(),
-        flow: [...p.flow, { time: now(), actor, action: '向领衔代表答复并送达答复函' }],
+        flow: [...p.flow, { time: now(), actor, action: '承办单位提交答复，已推回人大办' }],
+      })),
+    }));
+  }, []);
+
+  /** 管理员：转送代表（待转送 → 已答复），请领衔代表评价 */
+  const transferProposal = useCallback((id: string, actor: string) => {
+    setDb((prev) => ({
+      ...prev,
+      proposals: patchProposal(prev.proposals, id, (p) => ({
+        ...p,
+        status: '已答复',
+        flow: [...p.flow, { time: now(), actor, action: '人大办已转送领衔代表，请评价' }],
       })),
     }));
   }, []);
@@ -212,15 +237,17 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       logout,
       resetData,
       saveDeputy,
+      removeDeputy,
       saveActivity,
       removeActivity,
       addProposal,
       assignProposal,
       acceptProposal,
       replyProposal,
+      transferProposal,
       evaluateProposal,
     }),
-    [user, db, login, logout, resetData, saveDeputy, saveActivity, removeActivity, addProposal, assignProposal, acceptProposal, replyProposal, evaluateProposal],
+    [user, db, login, logout, resetData, saveDeputy, removeDeputy, saveActivity, removeActivity, addProposal, assignProposal, acceptProposal, replyProposal, transferProposal, evaluateProposal],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

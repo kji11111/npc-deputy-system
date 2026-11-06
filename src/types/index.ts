@@ -1,5 +1,5 @@
-/** 系统角色：管理员（人大主席团/人大办）与人大代表 */
-export type Role = 'admin' | 'deputy';
+/** 系统角色：管理员（人大办/主席团）、人大代表、承办单位（部门办理人员） */
+export type Role = 'admin' | 'deputy' | 'handler';
 
 /** mock 登录用户；代表角色通过 deputyId 绑定到具体代表档案 */
 export interface User {
@@ -8,6 +8,8 @@ export interface User {
   role: Role;
   /** 代表角色对应的代表档案 id，管理员为空 */
   deputyId?: string;
+  /** 承办单位角色绑定的单位名称（对应提案 handlerOrg） */
+  handlerOrg?: string;
 }
 
 /** 人大代表档案 */
@@ -64,13 +66,14 @@ export type ProposalCategory =
 
 /**
  * 交办流程状态机（业务核心，详见 PROJECT.md）：
- *   待审核 →(管理员审核交办：指定承办单位/期限)→ 已交办
+ *   待审核 →(人大办审核交办：指定承办单位/期限)→ 已交办
  *          →(承办单位受理)→ 办理中
- *          →(登记答复)→ 已答复
+ *          →(承办单位登记答复)→ 待转送
+ *          →(人大办转送代表)→ 已答复
  *          →(领衔代表满意度评价)→ 满意/基本满意 → 已评价（办结）
- *                                → 不满意 →(管理员退回重办)→ 已退回 →(再次交办)→ 已交办
+ *                                → 不满意 →(人大办退回重办)→ 已退回 →(再次交办)→ 已交办
  */
-export type ProposalStatus = '待审核' | '已交办' | '办理中' | '已答复' | '已评价' | '已退回';
+export type ProposalStatus = '待审核' | '已交办' | '办理中' | '待转送' | '已答复' | '已评价' | '已退回';
 
 /** 满意度评价结果 */
 export type Satisfaction = '满意' | '基本满意' | '不满意';

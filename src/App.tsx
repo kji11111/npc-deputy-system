@@ -10,7 +10,8 @@ import Proposals from './pages/Proposals';
 /**
  * 路由与登录守卫：
  * - 未登录只能访问 /login；
- * - 管理员默认进入仪表盘，代表角色默认进入“我的档案”且不可访问仪表盘。
+ * - 管理员默认进仪表盘；承办单位默认进提案办理；代表默认进“我的档案”；
+ * - 承办单位不可访问档案/活动页面（URL 直达也会被重定向回提案办理）。
  */
 export default function App() {
   const { user } = useStore();
@@ -24,13 +25,16 @@ export default function App() {
     );
   }
 
+  const home = user.role === 'admin' ? '/dashboard' : user.role === 'handler' ? '/proposals' : '/deputies';
+  const isStaff = user.role === 'admin' || user.role === 'deputy';
+
   return (
     <Routes>
       <Route element={<AdminLayout />}>
-        <Route path="/" element={<Navigate to={user.role === 'admin' ? '/dashboard' : '/deputies'} replace />} />
+        <Route path="/" element={<Navigate to={home} replace />} />
         {user.role === 'admin' && <Route path="/dashboard" element={<Dashboard />} />}
-        <Route path="/deputies" element={<Deputies />} />
-        <Route path="/activities" element={<Activities />} />
+        {isStaff && <Route path="/deputies" element={<Deputies />} />}
+        {isStaff && <Route path="/activities" element={<Activities />} />}
         <Route path="/proposals" element={<Proposals />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

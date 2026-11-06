@@ -9,11 +9,12 @@ import EChart from '../components/EChart';
 import StatCard from '../components/StatCard';
 
 const ACT_TYPES: ActivityType[] = ['调研视察', '约见镇长', '代表述职', '学习培训'];
-const STATUS_LIST: ProposalStatus[] = ['待审核', '已交办', '办理中', '已答复', '已评价', '已退回'];
+const STATUS_LIST: ProposalStatus[] = ['待审核', '已交办', '办理中', '待转送', '已答复', '已评价', '已退回'];
 const STATUS_COLORS: Record<ProposalStatus, string> = {
   待审核: '#d6a044',
   已交办: '#5b8ff9',
   办理中: '#11685f',
+  待转送: '#a58fb8',
   已答复: '#4ba39a',
   已评价: '#3f8f5f',
   已退回: '#c95656',

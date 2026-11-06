@@ -5,22 +5,31 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { DownloadOutlined, PlusOutlined } from '@ant-design/icons';
+import { useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
-import type { Proposal, ProposalCategory, ProposalStatus, Satisfaction } from '../types';
+import type { Proposal, ProposalCategory, ProposalStatus, Role, Satisfaction } from '../types';
 import { useStore } from '../store/AppStore';
 import { HANDLER_ORGS } from '../mocks/proposals';
 import { downloadCSV } from '../utils/csv';
 
 const CATS: ProposalCategory[] = ['城乡建设', '交通出行', '民生保障', '教育医疗', '生态环境', '乡村振兴', '其他'];
 const STATUS_COLORS: Record<ProposalStatus, string> = {
-  待审核: 'orange', 已交办: 'blue', 办理中: 'geekblue', 已答复: 'cyan', 已评价: 'green', 已退回: 'red',
+  待审核: 'orange', 已交办: 'blue', 办理中: 'geekblue', 待转送: 'purple', 已答复: 'cyan', 已评价: 'green', 已退回: 'red',
+};
+
+/** 各角色的“我的待办”状态集合（与顶栏 Badge 口径一致） */
+const TODO_STATUS: Record<Role, ProposalStatus[]> = {
+  admin: ['待审核', '待转送', '已退回'],
+  handler: ['已交办', '办理中'],
+  deputy: ['已答复'],
 };
 
 /** 流转时间线节点颜色：按动作关键词区分 */
 function flowColor(action: string): string {
   if (action.includes('退回') || action.includes('不满意')) return 'red';
   if (action.includes('评价') || action.includes('办结')) return 'green';
+  if (action.includes('转送')) return 'purple';
   if (action.includes('答复')) return '#13c2c2';
   if (action.includes('受理')) return '#d6a044';
   if (action.includes('交办')) return 'blue';
@@ -33,14 +42,20 @@ interface EvalFormValues { satisfaction: Satisfaction }
 interface CreateFormValues { title: string; category: ProposalCategory; content: string; proposerId?: string }
 
 /**
- * 提案建议交办：完整闭环工作流（管理员推动流转，代表评价）。
- * 待审核 --审核交办--> 已交办 --登记受理--> 办理中 --登记答复--> 已答复
- *      --满意度评价--> 满意/基本满意 → 已评价（办结）；不满意 → 已退回 --再次交办--> 已交办
+ * 提案建议交办：闭环工作流（人大办推动流转、承办单位办理、代表评价）。
+ * 待审核 --人大办审核交办--> 已交办 --承办单位受理--> 办理中
+ *       --承办单位登记答复--> 待转送 --人大办转送代表--> 已答复
+ *       --领衔代表评价--> 满意/基本满意 → 已评价（办结）；不满意 → 已退回 --再次交办--> 已交办
  */
 export default function Proposals() {
-  const { user, deputies, proposals, addProposal, assignProposal, acceptProposal, replyProposal, evaluateProposal } = useStore();
+  const { user, deputies, proposals, addProposal, assignProposal, acceptProposal, replyProposal, transferProposal, evaluateProposal } = useStore();
   const { message } = AntApp.useApp();
   const isAdmin = user?.role === 'admin';
+  const isHandler = user?.role === 'handler';
+
+  /** ?todo=1：由顶栏“我的待办”跳转而来，自动按当前角色待办状态筛选 */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const todoMode = searchParams.get('todo') === '1';
 
   const [kw, setKw] = useState('');
   const [status, setStatus] = useState<ProposalStatus | undefined>();
@@ -58,8 +73,19 @@ export default function Proposals() {
 
   const nameOf = (id: string) => deputies.find((d) => d.id === id)?.name ?? id;
 
-  /** 代表角色：本人领衔或附议的建议 */
-  const base = isAdmin ? proposals : proposals.filter((p) => p.proposerId === user?.deputyId || p.cosponsorIds.includes(user?.deputyId ?? ''));
+  /** 数据范围：管理员全部；承办单位只看交办给本单位的；代表看本人领衔或附议的 */
+  const base = useMemo(() => {
+    if (!user) return [] as Proposal[];
+    if (user.role === 'admin') return proposals;
+    if (user.role === 'handler') return proposals.filter((p) => p.handlerOrg === user.handlerOrg);
+    return proposals.filter((p) => p.proposerId === user.deputyId || p.cosponsorIds.includes(user.deputyId ?? ''));
+  }, [user, proposals]);
+
+  /** 当前角色的待办状态集合 */
+  const todoStatuses = useMemo<ProposalStatus[]>(() => (user ? TODO_STATUS[user.role] : []), [user]);
+
+  /** 待办总数（与顶栏 Badge 口径一致） */
+  const todoCount = useMemo(() => base.filter((p) => todoStatuses.includes(p.status)).length, [base, todoStatuses]);
 
   const list = useMemo(
     () =>
@@ -67,9 +93,10 @@ export default function Proposals() {
         (p) =>
           (!kw || p.title.includes(kw) || p.id.includes(kw)) &&
           (!status || p.status === status) &&
-          (!category || p.category === category),
+          (!category || p.category === category) &&
+          (!todoMode || todoStatuses.includes(p.status)),
       ),
-    [base, kw, status, category],
+    [base, kw, status, category, todoMode, todoStatuses],
   );
 
   const assignTarget = proposals.find((p) => p.id === assignId);
@@ -91,8 +118,9 @@ export default function Proposals() {
 
   const onReplyFinish = (v: ReplyFormValues) => {
     if (!replyId) return;
+    // 承办单位答复后进入“待转送”，由人大办转送领衔代表
     replyProposal(replyId, v.reply, user?.name ?? '');
-    message.success('答复已登记');
+    message.success('答复已提交，已推回人大办');
     setReplyId(undefined);
   };
 
@@ -120,7 +148,7 @@ export default function Proposals() {
       },
       user?.name ?? nameOf(proposerId),
     );
-    message.success('建议已提交，等待人大主席团审核交办');
+    message.success('建议已提交，等待人大办审核交办');
     setCreateOpen(false);
   };
 
@@ -158,50 +186,82 @@ export default function Proposals() {
       render: (_, p) => (
         <Space size={0} wrap>
           <Button type="link" size="small" onClick={() => setDetailId(p.id)}>详情</Button>
-          {/* 管理员按状态推动流转；代表仅能对自己领衔的已答复建议评价 */}
-          {isAdmin && p.status === '待审核' && <Button type="link" size="small" onClick={() => openAssign(p)}>审核交办</Button>}
-          {isAdmin && p.status === '已交办' && (
+          {/* 管理员：审核交办 / 转送代表 / 再次交办（不再做受理与答复） */}
+          {isAdmin && p.status === '待审核' && (
+            <Button type="link" size="small" onClick={() => openAssign(p)}>审核交办</Button>
+          )}
+          {isAdmin && p.status === '待转送' && (
             <Popconfirm
-              title="确认登记为承办单位已受理？"
-              okText="确认"
+              title="确认转送领衔代表？"
+              description="转送后请代表对办理结果作满意度评价。"
+              okText="转送"
+              cancelText="取消"
+              onConfirm={() => {
+                transferProposal(p.id, user?.name ?? '');
+                message.success('已转送领衔代表，请其评价');
+              }}
+            >
+              <Button type="link" size="small">转送代表</Button>
+            </Popconfirm>
+          )}
+          {isAdmin && p.status === '已退回' && (
+            <Button type="link" size="small" onClick={() => openAssign(p)}>再次交办</Button>
+          )}
+          {/* 承办单位：受理 / 登记答复 */}
+          {isHandler && p.status === '已交办' && (
+            <Popconfirm
+              title="确认受理该建议？"
+              description="受理后进入办理阶段，办理完毕请在“办理中”状态下登记答复。"
+              okText="受理"
               cancelText="取消"
               onConfirm={() => {
                 acceptProposal(p.id, p.handlerOrg ?? '');
                 message.success('已登记受理，进入办理阶段');
               }}
             >
-              <Button type="link" size="small">登记受理</Button>
+              <Button type="link" size="small">受理</Button>
             </Popconfirm>
           )}
-          {isAdmin && p.status === '办理中' && (
+          {isHandler && p.status === '办理中' && (
             <Button type="link" size="small" onClick={() => { setReplyId(p.id); replyForm.resetFields(); }}>登记答复</Button>
           )}
-          {isAdmin && p.status === '已退回' && <Button type="link" size="small" onClick={() => openAssign(p)}>再次交办</Button>}
-          {!isAdmin && p.status === '已答复' && p.proposerId === user?.deputyId && (
+          {/* 代表：本人领衔的已答复建议可评价 */}
+          {!isAdmin && !isHandler && p.status === '已答复' && p.proposerId === user?.deputyId && (
             <Button type="link" size="small" onClick={() => { setEvalId(p.id); evalForm.resetFields(); }}>满意度评价</Button>
           )}
         </Space>
       ),
     },
   ];
-
   return (
     <div>
       <Alert
         type="warning"
         showIcon
-        style={{ marginBottom: 16 }}
-        message="交办流程：待审核 → 审核交办 → 受理 → 办理中 → 登记答复 → 代表满意度评价（不满意可退回重办）"
-        description="每次状态变更都会写入流转记录，可在详情抽屉中查看完整时间线。"
+        style={{ marginBottom: 12 }}
+        message="交办流程：待审核 →(人大办审核交办)→ 已交办 →(承办单位受理)→ 办理中 →(承办单位登记答复)→ 待转送 →(人大办转送代表)→ 已答复 →(领衔代表评价)→ 已评价 / 已退回 →(再次交办)→ 已交办"
+        description="分工：人大办负责审核交办与转送代表；承办单位负责受理与登记答复；领衔代表负责满意度评价（不满意将退回重办）。每次状态变化都会写入流转时间线，点“详情”可查看谁推给谁。"
       />
+      {todoMode && (
+        <Alert
+          type="info"
+          showIcon
+          closable
+          style={{ marginBottom: 12 }}
+          message={'正在显示我的待办（' + todoStatuses.join('、') + '），共 ' + todoCount + ' 件；点击右侧 × 返回全部。'}
+          onClose={() => setSearchParams({})}
+        />
+      )}
       <Card size="small">
         <Space wrap style={{ marginBottom: 16 }}>
           <Input.Search allowClear placeholder="搜索标题 / 编号" style={{ width: 220 }} value={kw} onChange={(e) => setKw(e.target.value)} />
           <Select allowClear placeholder="状态" style={{ width: 120 }} value={status} onChange={setStatus} options={(Object.keys(STATUS_COLORS) as ProposalStatus[]).map((s) => ({ value: s, label: s }))} />
           <Select allowClear placeholder="分类" style={{ width: 130 }} value={category} onChange={setCategory} options={CATS.map((c) => ({ value: c, label: c }))} />
-          <Button icon={<PlusOutlined />} type="primary" onClick={() => { createForm.resetFields(); setCreateOpen(true); }}>
-            {isAdmin ? '新增登记' : '提交建议'}
-          </Button>
+          {!isHandler && (
+            <Button icon={<PlusOutlined />} type="primary" onClick={() => { createForm.resetFields(); setCreateOpen(true); }}>
+              {isAdmin ? '新增登记' : '提交建议'}
+            </Button>
+          )}
           {isAdmin && <Button icon={<DownloadOutlined />} onClick={exportCSV}>导出 CSV</Button>}
         </Space>
         <Table
@@ -216,7 +276,7 @@ export default function Proposals() {
 
       <ProposalDrawer proposalId={detailId} onClose={() => setDetailId(undefined)} />
 
-      {/* 审核交办 / 再次交办：指定承办单位与办理期限 */}
+      {/* 审核交办 / 再次交办：指定承办单位与办理期限（仅管理员） */}
       <Modal
         open={!!assignId}
         title={assignTarget?.status === '已退回' ? '退回件再次交办' : '审核通过并交办'}
@@ -235,23 +295,23 @@ export default function Proposals() {
         </Form>
       </Modal>
 
-      {/* 登记答复 */}
+      {/* 登记答复（仅承办单位）：填写后进入“待转送”，推回人大办 */}
       <Modal
         open={!!replyId}
-        title="登记答复"
-        okText="保存答复"
+        title="登记答复（提交后推回人大办转送）"
+        okText="提交答复"
         cancelText="取消"
         onOk={() => replyForm.submit()}
         onCancel={() => setReplyId(undefined)}
       >
         <Form form={replyForm} layout="vertical" onFinish={onReplyFinish}>
           <Form.Item name="reply" label="答复内容" rules={[{ required: true, message: '请填写答复内容' }]}>
-            <Input.TextArea rows={4} placeholder="填写向领衔代表反馈的办理与答复情况" />
+            <Input.TextArea rows={4} placeholder="填写本单位的办理情况与答复意见" />
           </Form.Item>
         </Form>
       </Modal>
 
-      {/* 领衔代表满意度评价 */}
+      {/* 满意度评价（仅领衔代表） */}
       <Modal
         open={!!evalId}
         title="满意度评价（领衔代表）"

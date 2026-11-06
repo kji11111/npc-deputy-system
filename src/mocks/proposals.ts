@@ -13,7 +13,7 @@ export const HANDLER_ORGS = ['镇人民政府办公室', '镇村镇建设服务�
 
 type Draft = Omit<Proposal, 'id'>;
 
-/** 手写 8 条：覆盖全部 6 种状态，交办链路完整 */
+/** 手写 8 条：覆盖全部 7 种状态，交办链路完整 */
 const drafts: Draft[] = [
   {
     title: '关于整治集贸市场占道经营的建议', category: '城乡建设',
@@ -47,7 +47,7 @@ const drafts: Draft[] = [
     flow: [
       f(dayjs().subtract(40, 'day').hour(9).minute(0).format('YYYY-MM-DD HH:mm'), nameOf('DB0004'), '提交建议'),
       f(dayjs().subtract(28, 'day').hour(14).minute(30).format('YYYY-MM-DD HH:mm'), '人大主席团', '审核通过并交办至城关派出所', '办理期限：' + dayjs().add(60, 'day').format('YYYY-MM-DD')),
-      f(dayjs().subtract(22, 'day').hour(10).minute(0).format('YYYY-MM-DD HH:mm'), '城关派出所', '承办单位受理，进入办理阶段'),
+      f(dayjs().subtract(22, 'day').hour(10).minute(0).format('YYYY-MM-DD HH:mm'), '城关派出所', '城关派出所受理'),
     ],
   },
   {
@@ -63,8 +63,9 @@ const drafts: Draft[] = [
     flow: [
       f(dayjs().subtract(70, 'day').hour(8).minute(40).format('YYYY-MM-DD HH:mm'), nameOf('DB0005'), '提交建议'),
       f(dayjs().subtract(60, 'day').hour(11).minute(0).format('YYYY-MM-DD HH:mm'), '人大主席团', '审核通过并交办至镇农业农村服务中心', '办理期限：' + dayjs().add(30, 'day').format('YYYY-MM-DD')),
-      f(dayjs().subtract(52, 'day').hour(9).minute(30).format('YYYY-MM-DD HH:mm'), '镇农业农村服务中心', '承办单位受理，进入办理阶段'),
-      f(dayjs().subtract(20, 'day').hour(16).minute(0).format('YYYY-MM-DD HH:mm'), '镇农业农村服务中心', '向领衔代表答复并送达答复函'),
+      f(dayjs().subtract(52, 'day').hour(9).minute(30).format('YYYY-MM-DD HH:mm'), '镇农业农村服务中心', '镇农业农村服务中心受理'),
+      f(dayjs().subtract(20, 'day').hour(16).minute(0).format('YYYY-MM-DD HH:mm'), '镇农业农村服务中心', '承办单位提交答复，已推回人大办'),
+      f(dayjs().subtract(19, 'day').hour(9).minute(0).format('YYYY-MM-DD HH:mm'), '人大办', '人大办已转送领衔代表，请评价'),
     ],
   },
   {
@@ -82,8 +83,9 @@ const drafts: Draft[] = [
     flow: [
       f(dayjs().subtract(120, 'day').hour(9).minute(20).format('YYYY-MM-DD HH:mm'), nameOf('DB0001'), '提交建议'),
       f(dayjs().subtract(110, 'day').hour(15).minute(0).format('YYYY-MM-DD HH:mm'), '人大主席团', '审核通过并交办至镇农业农村服务中心', '办理期限：' + dayjs().subtract(20, 'day').format('YYYY-MM-DD')),
-      f(dayjs().subtract(100, 'day').hour(9).minute(0).format('YYYY-MM-DD HH:mm'), '镇农业农村服务中心', '承办单位受理，进入办理阶段'),
-      f(dayjs().subtract(40, 'day').hour(10).minute(30).format('YYYY-MM-DD HH:mm'), '镇农业农村服务中心', '向领衔代表答复并送达答复函'),
+      f(dayjs().subtract(100, 'day').hour(9).minute(0).format('YYYY-MM-DD HH:mm'), '镇农业农村服务中心', '镇农业农村服务中心受理'),
+      f(dayjs().subtract(40, 'day').hour(10).minute(30).format('YYYY-MM-DD HH:mm'), '镇农业农村服务中心', '承办单位提交答复，已推回人大办'),
+      f(dayjs().subtract(39, 'day').hour(9).minute(0).format('YYYY-MM-DD HH:mm'), '人大办', '人大办已转送领衔代表，请评价'),
       f(dayjs().subtract(30, 'day').hour(9).minute(0).format('YYYY-MM-DD HH:mm'), nameOf('DB0001'), '满意度评价：满意，办结'),
     ],
   },
@@ -102,8 +104,9 @@ const drafts: Draft[] = [
     flow: [
       f(dayjs().subtract(150, 'day').hour(14).minute(0).format('YYYY-MM-DD HH:mm'), nameOf('DB0002'), '提交建议'),
       f(dayjs().subtract(140, 'day').hour(10).minute(0).format('YYYY-MM-DD HH:mm'), '人大主席团', '审核通过并交办至镇社会事务服务中心', '办理期限：' + dayjs().subtract(50, 'day').format('YYYY-MM-DD')),
-      f(dayjs().subtract(132, 'day').hour(9).minute(0).format('YYYY-MM-DD HH:mm'), '镇社会事务服务中心', '承办单位受理，进入办理阶段'),
-      f(dayjs().subtract(70, 'day').hour(15).minute(30).format('YYYY-MM-DD HH:mm'), '镇社会事务服务中心', '向领衔代表答复并送达答复函'),
+      f(dayjs().subtract(132, 'day').hour(9).minute(0).format('YYYY-MM-DD HH:mm'), '镇社会事务服务中心', '镇社会事务服务中心受理'),
+      f(dayjs().subtract(70, 'day').hour(15).minute(30).format('YYYY-MM-DD HH:mm'), '镇社会事务服务中心', '承办单位提交答复，已推回人大办'),
+      f(dayjs().subtract(69, 'day').hour(9).minute(0).format('YYYY-MM-DD HH:mm'), '人大办', '人大办已转送领衔代表，请评价'),
       f(dayjs().subtract(60, 'day').hour(9).minute(30).format('YYYY-MM-DD HH:mm'), nameOf('DB0002'), '满意度评价：基本满意，办结', '部分改造项目列入下年度预算'),
     ],
   },
@@ -122,8 +125,9 @@ const drafts: Draft[] = [
     flow: [
       f(dayjs().subtract(100, 'day').hour(8).minute(50).format('YYYY-MM-DD HH:mm'), nameOf('DB0006'), '提交建议'),
       f(dayjs().subtract(90, 'day').hour(14).minute(0).format('YYYY-MM-DD HH:mm'), '人大主席团', '审核通过并交办至镇卫生院', '办理期限：' + dayjs().subtract(10, 'day').format('YYYY-MM-DD')),
-      f(dayjs().subtract(80, 'day').hour(9).minute(0).format('YYYY-MM-DD HH:mm'), '镇卫生院', '承办单位受理，进入办理阶段'),
-      f(dayjs().subtract(30, 'day').hour(11).minute(0).format('YYYY-MM-DD HH:mm'), '镇卫生院', '向领衔代表答复并送达答复函'),
+      f(dayjs().subtract(80, 'day').hour(9).minute(0).format('YYYY-MM-DD HH:mm'), '镇卫生院', '镇卫生院受理'),
+      f(dayjs().subtract(30, 'day').hour(11).minute(0).format('YYYY-MM-DD HH:mm'), '镇卫生院', '承办单位提交答复，已推回人大办'),
+      f(dayjs().subtract(29, 'day').hour(9).minute(0).format('YYYY-MM-DD HH:mm'), '人大办', '人大办已转送领衔代表，请评价'),
       f(dayjs().subtract(25, 'day').hour(9).minute(40).format('YYYY-MM-DD HH:mm'), nameOf('DB0006'), '满意度评价：不满意，退回重办', '答复措施不具体，要求补充人员排班方案后重新办理'),
     ],
   },
@@ -137,7 +141,7 @@ const drafts: Draft[] = [
   },
 ];
 
-/** 程序化补齐 12 条：状态按真实流程分布，时间链保持“提交<交办<受理<答复<评价” */
+/** 程序化补齐 12 条：状态按真实流程分布，时间链保持“提交<交办<受理<答复<转送<评价” */
 const genSpecs: Array<[string, ProposalCategory]> = [
   ['增设镇区公交站台候车亭', '交通出行'],
   ['农村道路错车道改造', '交通出行'],
@@ -152,7 +156,7 @@ const genSpecs: Array<[string, ProposalCategory]> = [
   ['社区养老助餐点建设', '民生保障'],
   ['农田灌溉渠系修缮', '乡村振兴'],
 ];
-const statusPool: ProposalStatus[] = ['已交办', '已交办', '办理中', '办理中', '已答复', '已答复', '已评价', '已评价', '待审核', '待审核', '已退回', '已交办'];
+const statusPool: ProposalStatus[] = ['已交办', '已交办', '办理中', '办理中', '待转送', '待转送', '已答复', '已评价', '待审核', '待审核', '已退回', '已交办'];
 const satPool: Satisfaction[] = ['满意', '满意', '基本满意', '满意', '基本满意'];
 
 const genDrafts: Draft[] = genSpecs.map((spec, i) => {
@@ -173,7 +177,8 @@ const genDrafts: Draft[] = genSpecs.map((spec, i) => {
     flow,
   };
   if (status !== '待审核') {
-    const org = pick(rng, HANDLER_ORGS);
+    // 前三件固定交办给“镇村镇建设服务中心”，保证承办单位角色一进来就有活干
+    const org = i < 3 ? '镇村镇建设服务中心' : pick(rng, HANDLER_ORGS);
     const assignedAt = submittedAt.add(8, 'day');
     const deadline = assignedAt.add(90, 'day').format('YYYY-MM-DD');
     draft.handlerOrg = org;
@@ -182,12 +187,14 @@ const genDrafts: Draft[] = genSpecs.map((spec, i) => {
     flow.push(f(assignedAt.format('YYYY-MM-DD HH:mm'), '人大主席团', '审核通过并交办至' + org, '办理期限：' + deadline));
     if (status !== '已交办') {
       const acceptedAt = assignedAt.add(5, 'day');
-      flow.push(f(acceptedAt.format('YYYY-MM-DD HH:mm'), org, '承办单位受理，进入办理阶段'));
+      flow.push(f(acceptedAt.format('YYYY-MM-DD HH:mm'), org, org + '受理'));
       if (status === '已答复' || status === '已评价' || status === '已退回') {
         const repliedAt = assignedAt.add(35, 'day');
         draft.reply = '已会同相关站所实地核查，明确整改措施与责任人，办理情况已书面答复领衔代表。';
         draft.repliedAt = repliedAt.format('YYYY-MM-DD HH:mm');
-        flow.push(f(repliedAt.format('YYYY-MM-DD HH:mm'), org, '向领衔代表答复并送达答复函'));
+        flow.push(f(repliedAt.format('YYYY-MM-DD HH:mm'), org, '承办单位提交答复，已推回人大办'));
+        // 答复后进入“待转送”，等人大办转送领衔代表
+        flow.push(f(repliedAt.add(1, 'day').format('YYYY-MM-DD HH:mm'), '人大办', '人大办已转送领衔代表，请评价'));
         if (status === '已评价' || status === '已退回') {
           const sat: Satisfaction = status === '已评价' ? pick(rng, satPool) : '不满意';
           const evaluatedAt = repliedAt.add(8, 'day');
